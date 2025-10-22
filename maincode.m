@@ -2,21 +2,21 @@
 % clear;
 % close all;
 
-%% Step 1: Define original high-order time-delay system
+
 s = tf('s');
 numerator = [1 5];
-denominator = [1 10 35 50 24];  % 4th-order denominator
+denominator = [1 10 35 50 24];  
 G = tf(numerator, denominator);
-T_delay = 2;                   % Time delay in seconds
+T_delay = 2;                   
 G.InputDelay = T_delay;
 
-%% Step 2: Padé Delay Approximation
+
 pade_order = 4;
 [num_pade, den_pade] = pade(T_delay, pade_order);
 Delay_approx = tf(num_pade, den_pade);
-G_rational = G * Delay_approx;  % Approximate delay as rational TF
+G_rational = G * Delay_approx;  
 
-%% Step 3: Mihailov Plot (plot denominator polynomial on complex jw axis)
+
 [~, den_rational] = tfdata(G_rational, 'v');
 omega = logspace(-1, 2, 500);
 jw = 1i * omega;
@@ -29,12 +29,12 @@ ylabel('Im[P(j\omega)]');
 title('Mihailov Plot');
 grid on;
 
-%% Step 4: Balanced Truncation for Model Order Reduction
+
 reduced_order = 2;  % Desired reduced order
 G_balred = balred(G_rational, reduced_order);
 [num_red, den_red] = tfdata(G_balred, 'v');
 
-%% Step 5: Moment Matching (Impulse Response Scaling)
+
 t_vec = linspace(0, 30, 1500);
 [y_full, ~] = impulse(G_rational, t_vec);
 [y_red, ~] = impulse(tf(num_red, den_red), t_vec);
@@ -47,7 +47,7 @@ end
 
 num_red_matched = num_red * scaling_factor;
 
-% Check for very small numerator coefficients
+
 if all(abs(num_red_matched) < 1e-10)
     warning('Numerator coefficients near zero after scaling, reverting.');
     num_red_matched = num_red;
@@ -55,24 +55,24 @@ end
 
 G_moment_matched = tf(num_red_matched, den_red);
 
-%% Step 6: EDE Optimization (Step Response Matching)
+
 [y_target, ~] = step(G_rational, t_vec);
 
 cost_fun = @(num_coeffs) sum((step(tf(num_coeffs, den_red), t_vec) - y_target).^2);
 
 opts = optimset('Display','off','MaxIter',1000,'TolFun',1e-8,'TolX',1e-8);
 
-% Start optimization from moment matched numerator
+
 [num_opt, ~] = fminsearch(cost_fun, num_red_matched, opts);
 
 G_ede = tf(num_opt, den_red);
 
-%% Step 7: Final Reduced Model
+
 G_final_reduced = G_ede;
 disp('Final Reduced Model:');
 G_final_reduced
 
-%% Step 8: IMC Controller Design
+
 G_red_no_delay = G_final_reduced;  % Approx reduced model without delay (already approximated)
 
 try
@@ -86,7 +86,7 @@ lambda = 0.5; % Filter tuning parameter
 F = tf(1, [lambda 1]);
 Gc = minreal(Q * F);
 
-% Ensure controller properness (order numerator ≤ denominator)
+
 if order(Gc) > order(G_red_no_delay)
     warning('IMC controller improper, increasing lambda to fix.');
     lambda = 1.5;
@@ -97,7 +97,7 @@ end
 disp('IMC Controller:');
 Gc
 
-%% Step 9: Closed-loop System with Reduced Model
+
 T_imc = feedback(G_final_reduced * Gc, 1);
 
 figure;
@@ -123,7 +123,7 @@ plot(t_red, y_red, 'b--', 'LineWidth', 2);
 legend('Original', 'Reduced');
 grid on;
 
-%% Step Info Metrics
+
 S_orig = stepinfo(y_orig, t_orig);
 S_red = stepinfo(y_red, t_red);
 
@@ -132,7 +132,7 @@ disp(S_orig);
 disp('Reduced Model Closed Loop Performance:');
 disp(S_red);
 
-%% Step 11: Step Response Comparison
+
 figure;
 step(G_rational, G_moment_matched, G_final_reduced);
 legend('Original (Padé approx)', 'Reduced (Moment Matching)', 'Reduced (EDE Optimized)', 'Location', 'Best');
@@ -141,7 +141,7 @@ xlabel('Time (s)');
 ylabel('Amplitude');
 grid on;
 
-%% Step 12: Impulse Response Comparison
+
 figure;
 impulse(G_rational, 'b-', t_vec); hold on;
 impulse(G_moment_matched, 'r--', t_vec);
@@ -204,4 +204,5 @@ function J = ise_step_cost(num, den, y_ref, t)
         J = Inf;  % If transfer function fails (e.g., unstable), return large error
     end
 end
+
 
